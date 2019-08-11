@@ -105,7 +105,7 @@ func main() {
 			if m1 != d3.value {
 				done := false
 				for !done {
-					done = d4.Morph(m1)
+					done = d3.Morph(m1)
 					draw.Draw(canvas, d3pos, d3.img, image.ZP, draw.Src)
 					canvas.RenderKeep()
 					time.Sleep(animSpeed * time.Millisecond)
