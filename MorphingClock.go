@@ -76,58 +76,49 @@ func main() {
 		h2, _ := strconv.Atoi(clock[1:2])
 		m1, _ := strconv.Atoi(clock[3:4])
 		m2, _ := strconv.Atoi(clock[4:5])
+		
+		if !leadingZero && h1 == 0 {
+			h1 = -1
+		}
 
+		if m2 != d4.value {
+			done := false
+			for !done {
+				done = d4.Morph(m2)
+				draw.Draw(canvas, d4pos, d4.img, image.ZP, draw.Src)
+				canvas.RenderKeep()
+				time.Sleep(animSpeed * time.Millisecond)
+			}
+		}
+		if m1 != d3.value {
+			done := false
+			for !done {
+				done = d3.Morph(m1)
+				draw.Draw(canvas, d3pos, d3.img, image.ZP, draw.Src)
+				canvas.RenderKeep()
+				time.Sleep(animSpeed * time.Millisecond)
+			}
+		}
 		if initialTime {
 			draw.Draw(canvas, copos, co.img, image.ZP, draw.Src)
-			d4.Draw(m2)
-			draw.Draw(canvas, d4pos, d4.img, image.ZP, draw.Src)
-			d3.Draw(m1)
-			draw.Draw(canvas, d3pos, d3.img, image.ZP, draw.Src)
-			d2.Draw(h2)
-			draw.Draw(canvas, d2pos, d2.img, image.ZP, draw.Src)
-			if leadingZero || h1 != 0 {
-				d1.Draw(h1)
+			time.Sleep(animSpeed * time.Millisecond)
+		}
+		if h2 != d2.value {
+			done := false
+			for !done {
+				done = d2.Morph(h2)
+				draw.Draw(canvas, d2pos, d2.img, image.ZP, draw.Src)
+				canvas.RenderKeep()
+				time.Sleep(animSpeed * time.Millisecond)
+			}
+		}
+		if h1 != d1.value {
+			done := false
+			for !done {
+				done = d1.Morph(h1)
 				draw.Draw(canvas, d1pos, d1.img, image.ZP, draw.Src)
-			}
-		
-			canvas.RenderKeep()
-			initialTime = false
-		} else {
-			if m2 != d4.value {
-				done := false
-				for !done {
-					done = d4.Morph(m2)
-					draw.Draw(canvas, d4pos, d4.img, image.ZP, draw.Src)
-					canvas.RenderKeep()
-					time.Sleep(animSpeed * time.Millisecond)
-				}
-			}
-			if m1 != d3.value {
-				done := false
-				for !done {
-					done = d3.Morph(m1)
-					draw.Draw(canvas, d3pos, d3.img, image.ZP, draw.Src)
-					canvas.RenderKeep()
-					time.Sleep(animSpeed * time.Millisecond)
-				}
-			}
-			if h2 != d2.value {
-				done := false
-				for !done {
-					done = d2.Morph(h2)
-					draw.Draw(canvas, d2pos, d2.img, image.ZP, draw.Src)
-					canvas.RenderKeep()
-					time.Sleep(animSpeed * time.Millisecond)
-				}
-			}
-			if h1 != d1.value {
-				done := false
-				for !done {
-					done = d1.Morph(h1)
-					draw.Draw(canvas, d1pos, d1.img, image.ZP, draw.Src)
-					canvas.RenderKeep()
-					time.Sleep(animSpeed * time.Millisecond)
-				}
+				canvas.RenderKeep()
+				time.Sleep(animSpeed * time.Millisecond)
 			}
 		}
 		target := time.Now().Truncate(time.Minute).Add(time.Minute)

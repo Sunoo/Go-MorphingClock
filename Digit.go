@@ -112,11 +112,19 @@ func (d *Digit) drawSeg(seg int) {
 }
 
 func (d *Digit) Draw(value int) {
-	for i := 0; i < 7; i++ {
-		if digitBits[value][i] {d.drawSeg(i)}
+	if value == -1 {
+		draw.Draw(d.img, d.img.Bounds(), &image.Uniform{color.Black}, image.ZP, draw.Src)
+	} else {
+		for i := 0; i < 7; i++ {
+			if digitBits[value][i] {d.drawSeg(i)}
+		}
 	}
 	d.value = value
 	d.frame = 0
+}
+
+func (d *Digit) Blank() {
+	d.Draw(-1)
 }
 
 func (d *Digit) Morph1() bool {
@@ -327,7 +335,11 @@ func (d *Digit) Morph0() bool {
 }
 
 func (d *Digit) Morph(value int) bool {
-	var done bool = false
+	if d.value == -1 {
+		d.Draw(value)
+		return true
+	} else {
+	done := false
 	switch value {
 		case 1:
 			done = d.Morph1()
@@ -349,9 +361,13 @@ func (d *Digit) Morph(value int) bool {
 			done = d.Morph9()
 		case 0:
 			done = d.Morph0()
+		case -1:
+			d.Blank()
+			done = true
 	}
 	if done {
 		d.value = value
 	}
 	return done
+	}
 }
