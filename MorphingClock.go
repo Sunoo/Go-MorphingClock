@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"time"
 	"strconv"
 	"os"
@@ -20,6 +19,7 @@ var (
 	clockConfig = ClockConfig{hsv.HSVColor{240, 100, 30}, 1, 2, 4, false, "03:04", 30 * time.Millisecond, 16, 32, 1, 1, "regular", false, false, false}
 	canvas *rgbmatrix.Canvas
 	sketch *image.RGBA
+	power = true
 )
 
 type ClockConfig struct {
@@ -41,18 +41,20 @@ type ClockConfig struct {
 }
 
 func Render() {
-	newR, newG, newB, _ := clockConfig.ClockColor.RGBA()
-	bounds := sketch.Bounds()
-	for curX := bounds.Min.X; curX < bounds.Max.X; curX++ {
-		for curY := bounds.Min.Y; curY < bounds.Max.Y; curY++ {
-			curR, curG, curB, curA := sketch.At(curX, curY).RGBA()
-			curR = curR * newR / 255
-			curG = curG * newG / 255
-			curB = curB * newB / 255
-			canvas.Set(curX, curY, color.RGBA{uint8(curR), uint8(curG), uint8(curB), uint8(curA)})
+	if (power) {
+		newR, newG, newB, _ := clockConfig.ClockColor.RGBA()
+		bounds := sketch.Bounds()
+		for curX := bounds.Min.X; curX < bounds.Max.X; curX++ {
+			for curY := bounds.Min.Y; curY < bounds.Max.Y; curY++ {
+				curR, curG, curB, curA := sketch.At(curX, curY).RGBA()
+				curR = curR * newR / 255
+				curG = curG * newG / 255
+				curB = curB * newB / 255
+				canvas.Set(curX, curY, color.RGBA{uint8(curR), uint8(curG), uint8(curB), uint8(curA)})
+			}
 		}
 	}
-	canvas.RenderKeep()
+	canvas.Render()
 }
 
 func main() {
@@ -92,12 +94,12 @@ func main() {
 	acc.Lightbulb.Hue.SetValue(clockConfig.ClockColor.H)
 	
 	acc.Lightbulb.On.OnValueRemoteUpdate(func(on bool) {
-		fmt.Println("on:", on)
-		if on {
+		power = on;
+		/*if on {
 			m.SetBrightness(clockConfig.ClockColor.V)
 		} else {
 			m.SetBrightness(0)
-		}
+		}*/
 		Render()
 	})
 	
