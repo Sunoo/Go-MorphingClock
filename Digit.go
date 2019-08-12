@@ -58,7 +58,7 @@ func NewColon(segLength int) Digit {
 func (d *Digit) drawPixel(x int, y int, active bool) {
 	var col color.RGBA
 	if active {
-		col = color.RGBA{0, 0, 255, 255}
+		col = color.RGBA{255, 255, 255, 255}
 	} else {
 		col = color.RGBA{0, 0, 0, 255}
 	}
