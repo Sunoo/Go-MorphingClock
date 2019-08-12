@@ -339,35 +339,35 @@ func (d *Digit) Morph(value int) bool {
 		d.Draw(value)
 		return true
 	} else {
-	done := false
-	switch value {
-		case 1:
-			done = d.Morph1()
-		case 2:
-			done = d.Morph2()
-		case 3:
-			done = d.Morph3()
-		case 4:
-			done = d.Morph4()
-		case 5:
-			done = d.Morph5()
-		case 6:
-			done = d.Morph6()
-		case 7:
-			done = d.Morph7()
-		case 8:
-			done = d.Morph8()
-		case 9:
-			done = d.Morph9()
-		case 0:
-			done = d.Morph0()
-		case -1:
-			d.Blank()
-			done = true
-	}
-	if done {
-		d.value = value
-	}
-	return done
+		done := false
+		switch value {
+			case 1:
+				done = d.Morph1()
+			case 2:
+				done = d.Morph2()
+			case 3:
+				done = d.Morph3()
+			case 4:
+				done = d.Morph4()
+			case 5:
+				done = d.Morph5()
+			case 6:
+				done = d.Morph6()
+			case 7:
+				done = d.Morph7()
+			case 8:
+				done = d.Morph8()
+			case 9:
+				done = d.Morph9()
+			case 0:
+				done = d.Morph0()
+			case -1:
+				d.Blank()
+				done = true
+		}
+		if done {
+			d.value = value
+		}
+		return done
 	}
 }

@@ -1,14 +1,15 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"time"
 	"strconv"
+	"os"
 	"image"
 	"image/draw"
-	"os"
 	"image/color"
+	"encoding/json"
+	"io/ioutil"
 	"github.com/Sunoo/go-rpi-rgb-led-matrix"
 	"github.com/brutella/hc"
 	"github.com/brutella/hc/accessory"
@@ -16,32 +17,31 @@ import (
 )
 
 var (
-	rows                     = flag.Int("led-rows", 16, "number of rows supported")
-	cols                     = flag.Int("led-cols", 32, "number of columns supported")
-	parallel                 = flag.Int("led-parallel", 1, "number of daisy-chained panels")
-	chain                    = flag.Int("led-chain", 1, "number of displays daisy-chained")
-	brightness               = flag.Int("brightness", 30, "brightness (0-100)")
-	hardware_mapping         = flag.String("led-gpio-mapping", "regular", "Name of GPIO mapping used.")
-	show_refresh             = flag.Bool("led-show-refresh", false, "Show refresh rate.")
-	inverse_colors           = flag.Bool("led-inverse", false, "Switch if your matrix has inverse colors on.")
-	disable_hardware_pulsing = flag.Bool("led-no-hardware-pulse", false, "Don't use hardware pin-pulse generation.")
-	clockColor = hsv.HSVColor{240, 100, *brightness}
+	clockConfig = ClockConfig{hsv.HSVColor{240, 100, 30}, 1, 2, 4, false, "03:04", 30 * time.Millisecond, 16, 32, 1, 1, "regular", false, false, false}
+	canvas *rgbmatrix.Canvas
+	sketch *image.RGBA
 )
 
-const (
-	/*xOrig = 1
-	yOrig = 2
-	segLength = 4*/
-	xOrig = -6
-	yOrig = 1
-	segLength = 6
-	leadingZero = false
-	timeFormat = "03:04"
-	animSpeed = 30
-)
+type ClockConfig struct {
+	ClockColor hsv.HSVColor
+	XOrig int
+	YOrig int
+	SegLength int
+	LeadingZero bool
+	TimeFormat string
+	AnimSpeed time.Duration
+	Rows int
+	Cols int
+	Parallel int
+	Chain int
+	HardwareMapping string
+	ShowRefresh bool
+	InverseColors bool
+	DisableHardwarePulsing bool
+}
 
-func Render(canvas *rgbmatrix.Canvas, sketch *image.RGBA, clockColor hsv.HSVColor) {
-	newR, newG, newB, _ := clockColor.RGBA()
+func Render() {
+	newR, newG, newB, _ := clockConfig.ClockColor.RGBA()
 	bounds := sketch.Bounds()
 	for curX := bounds.Min.X; curX < bounds.Max.X; curX++ {
 		for curY := bounds.Min.Y; curY < bounds.Max.Y; curY++ {
@@ -56,78 +56,85 @@ func Render(canvas *rgbmatrix.Canvas, sketch *image.RGBA, clockColor hsv.HSVColo
 }
 
 func main() {
+	jsonConfig, _ := ioutil.ReadFile("config.json")
+	json.Unmarshal(jsonConfig, &clockConfig)
+	
 	config := &rgbmatrix.DefaultConfig
-	config.Rows = *rows
-	config.Cols = *cols
-	config.Parallel = *parallel
-	config.ChainLength = *chain
-	config.Brightness = *brightness
-	config.HardwareMapping = *hardware_mapping
-	config.ShowRefreshRate = *show_refresh
-	config.InverseColors = *inverse_colors
-	config.DisableHardwarePulsing = *disable_hardware_pulsing
+	config.Rows = clockConfig.Rows
+	config.Cols = clockConfig.Cols
+	config.Parallel = clockConfig.Parallel
+	config.ChainLength = clockConfig.Chain
+	config.Brightness = clockConfig.ClockColor.V
+	config.HardwareMapping = clockConfig.HardwareMapping
+	config.ShowRefreshRate = clockConfig.ShowRefresh
+	config.InverseColors = clockConfig.InverseColors
+	config.DisableHardwarePulsing = clockConfig.DisableHardwarePulsing
 	
 	m, _ := rgbmatrix.NewRGBLedMatrix(config)
 
-	canvas := rgbmatrix.NewCanvas(m)
+	canvas = rgbmatrix.NewCanvas(m)
 	defer canvas.Close()
 	
-	sketch := image.NewRGBA(canvas.Bounds())
+	sketch = image.NewRGBA(canvas.Bounds())
 	
 	info := accessory.Info{
 		Name:         "Clock",
+		SerialNumber: "rpi-rgb-led-matrix",
 		Manufacturer: "Sunoo",
+		Model:        "Morphing Clock",
 	}
 
 	acc := accessory.NewLightbulb(info)
 	
 	acc.Lightbulb.On.SetValue(true)
-	acc.Lightbulb.Brightness.SetValue(clockColor.V)
-	acc.Lightbulb.Saturation.SetValue(clockColor.S)
-	acc.Lightbulb.Hue.SetValue(clockColor.H)
+	acc.Lightbulb.Brightness.SetValue(clockConfig.ClockColor.V)
+	acc.Lightbulb.Saturation.SetValue(clockConfig.ClockColor.S)
+	acc.Lightbulb.Hue.SetValue(clockConfig.ClockColor.H)
 	
 	acc.Lightbulb.On.OnValueRemoteUpdate(func(on bool) {
 		fmt.Println("on:", on)
 		if on {
-			m.SetBrightness(clockColor.V)
+			m.SetBrightness(clockConfig.ClockColor.V)
 		} else {
 			m.SetBrightness(0)
 		}
-		Render(canvas, sketch, clockColor)
+		Render()
 	})
 	
 	acc.Lightbulb.Brightness.OnValueRemoteUpdate(func(bright int) {
-		clockColor.V = bright
+		clockConfig.ClockColor.V = bright
 		m.SetBrightness(bright)
-		Render(canvas, sketch, clockColor)
+		Render()
 	})
 	
 	acc.Lightbulb.Saturation.OnValueRemoteUpdate(func(sat float64) {
-		clockColor.S = sat
-		Render(canvas, sketch, clockColor)
+		clockConfig.ClockColor.S = sat
+		Render()
 	})
 	
 	acc.Lightbulb.Hue.OnValueRemoteUpdate(func(hue float64) {
-		clockColor.H = hue
-		Render(canvas, sketch, clockColor)
+		clockConfig.ClockColor.H = hue
+		Render()
 	})
 
 	t, _ := hc.NewIPTransport(hc.Config{Pin: "12312312"}, acc.Accessory)
 	
 	hc.OnTermination(func() {
 		<-t.Stop()
+		jsonConfig, _ := json.MarshalIndent(clockConfig, "", "\t")
+		ioutil.WriteFile("config.json", jsonConfig, 0666)
 		os.Exit(0)
 	})
 
 	go t.Start()
 	
-	d1 := NewDigit(segLength)
-	d2 := NewDigit(segLength)
-	co := NewColon(segLength)
-	d3 := NewDigit(segLength)
-	d4 := NewDigit(segLength)
+	d1 := NewDigit(clockConfig.SegLength)
+	d2 := NewDigit(clockConfig.SegLength)
+	co := NewColon(clockConfig.SegLength)
+	d3 := NewDigit(clockConfig.SegLength)
+	d4 := NewDigit(clockConfig.SegLength)
 	
-	d1start := image.Point{xOrig, yOrig}
+	d1start := image.Point{clockConfig.XOrig, clockConfig.YOrig}
 	d2start := d1start.Add(image.Point{d1.img.Bounds().Max.X + 1, 0})
 	costart := d2start.Add(image.Point{d2.img.Bounds().Max.X + 1, 0})
 	d3start := costart.Add(image.Point{co.img.Bounds().Max.X + 1, 0})
@@ -142,13 +149,13 @@ func main() {
 	initialTime := true
 	
 	for {
-		clock := time.Now().Format(timeFormat)
+		clock := time.Now().Format(clockConfig.TimeFormat)
 		h1, _ := strconv.Atoi(clock[0:1])
 		h2, _ := strconv.Atoi(clock[1:2])
 		m1, _ := strconv.Atoi(clock[3:4])
 		m2, _ := strconv.Atoi(clock[4:5])
 		
-		if !leadingZero && h1 == 0 {
+		if !clockConfig.LeadingZero && h1 == 0 {
 			h1 = -1
 		}
 
@@ -157,8 +164,8 @@ func main() {
 			for !done {
 				done = d4.Morph(m2)
 				draw.Draw(sketch, d4pos, d4.img, image.ZP, draw.Src)
-				Render(canvas, sketch, clockColor)
-				time.Sleep(animSpeed * time.Millisecond)
+				Render()
+				time.Sleep(clockConfig.AnimSpeed)
 			}
 		}
 		if m1 != d3.value {
@@ -166,21 +173,22 @@ func main() {
 			for !done {
 				done = d3.Morph(m1)
 				draw.Draw(sketch, d3pos, d3.img, image.ZP, draw.Src)
-				Render(canvas, sketch, clockColor)
-				time.Sleep(animSpeed * time.Millisecond)
+				Render()
+				time.Sleep(clockConfig.AnimSpeed)
 			}
 		}
 		if initialTime {
 			draw.Draw(sketch, copos, co.img, image.ZP, draw.Src)
-			time.Sleep(animSpeed * time.Millisecond)
+			Render()
+			time.Sleep(clockConfig.AnimSpeed)
 		}
 		if h2 != d2.value {
 			done := false
 			for !done {
 				done = d2.Morph(h2)
 				draw.Draw(sketch, d2pos, d2.img, image.ZP, draw.Src)
-				Render(canvas, sketch, clockColor)
-				time.Sleep(animSpeed * time.Millisecond)
+				Render()
+				time.Sleep(clockConfig.AnimSpeed)
 			}
 		}
 		if h1 != d1.value {
@@ -188,8 +196,8 @@ func main() {
 			for !done {
 				done = d1.Morph(h1)
 				draw.Draw(sketch, d1pos, d1.img, image.ZP, draw.Src)
-				Render(canvas, sketch, clockColor)
-				time.Sleep(animSpeed * time.Millisecond)
+				Render()
+				time.Sleep(clockConfig.AnimSpeed)
 			}
 		}
 		target := time.Now().Truncate(time.Minute).Add(time.Minute)
