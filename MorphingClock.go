@@ -4,6 +4,8 @@ import (
 	"time"
 	"strconv"
 	"os"
+	"net"
+	"bytes"
 	"image"
 	"image/draw"
 	"image/color"
@@ -13,10 +15,12 @@ import (
 	"github.com/brutella/hc"
 	"github.com/brutella/hc/accessory"
 	"github.com/Sunoo/hsv"
+	"github.com/lmittmann/ppm"
 )
 
 var (
-	clockConfig = ClockConfig{hsv.HSVColor{240, 100, 30}, 1, 2, 4, false, "03:04", 30 * time.Millisecond, 16, 32, 1, 1, "regular", false, false, false}
+	clockConfig = ClockConfig{hsv.HSVColor{240, 100, 30}, 1, 2, 4, false, "03:04", 30 * time.Millisecond, 5 * time.Second, 16, 32, 1, 1, "regular", false, false, false}
+	matrix rgbmatrix.Matrix
 	canvas *rgbmatrix.Canvas
 	sketch *image.RGBA
 	power = true
@@ -32,6 +36,7 @@ type ClockConfig struct {
 	LeadingZero bool
 	TimeFormat string
 	AnimSpeed time.Duration
+	ClockReturn time.Duration
 	Rows int
 	Cols int
 	Parallel int
@@ -145,6 +150,56 @@ func RunClock() {
 	}
 }
 
+func Flaschen() {
+	pc, err := net.ListenPacket("udp", ":1337")
+	if err != nil {
+		return
+	}
+	defer pc.Close()
+
+	doneChan := make(chan error, 1)
+	buffer := make([]byte, 65535)
+	clockStopped := false
+
+	f := func() {
+		clockStopped = false
+		matrix.SetBrightness(clockConfig.ClockColor.V)
+		go RunClock()
+	}
+	timer := time.AfterFunc(clockConfig.ClockReturn, f)
+	timer.Stop()
+
+	go func() {
+		for {
+			n, _, err := pc.ReadFrom(buffer)
+			if err != nil {
+				doneChan <- err
+				return
+			}
+			
+			if !clockStopped {
+				matrix.SetBrightness(100)
+				stopchan <- true
+				<-stoppedchan
+				clockStopped = true
+			}
+			
+			timer.Reset(clockConfig.ClockReturn)
+			
+			img, err := ppm.Decode(bytes.NewReader(buffer[:n]))
+			if err != nil {
+				doneChan <- err
+				return
+			}
+			
+			draw.Draw(canvas, canvas.Bounds(), img, image.ZP, draw.Src)
+    		canvas.Render()
+		}
+	}()
+
+	select {}
+}
+
 func main() {
 	jsonConfig, _ := ioutil.ReadFile("config.json")
 	json.Unmarshal(jsonConfig, &clockConfig)
@@ -163,9 +218,9 @@ func main() {
 	config.InverseColors = clockConfig.InverseColors
 	config.DisableHardwarePulsing = clockConfig.DisableHardwarePulsing
 	
-	m, _ := rgbmatrix.NewRGBLedMatrix(config)
+	matrix, _ = rgbmatrix.NewRGBLedMatrix(config)
 
-	canvas = rgbmatrix.NewCanvas(m)
+	canvas = rgbmatrix.NewCanvas(matrix)
 	defer canvas.Close()
 	
 	info := accessory.Info{
@@ -187,16 +242,16 @@ func main() {
 			power = on;
 			if on {
 				go RunClock()
-				<-stoppedchan
 			} else {
 				stopchan <- true
+				<-stoppedchan
 			}
 		}
 	})
 	
 	acc.Lightbulb.Brightness.OnValueRemoteUpdate(func(bright int) {
 		clockConfig.ClockColor.V = bright
-		m.SetBrightness(bright)
+		matrix.SetBrightness(bright)
 		Render()
 	})
 	
@@ -223,5 +278,13 @@ func main() {
 	
 	go RunClock()
 	
+	go Flaschen()
+	
 	select {}
+}
+
+func fatal(err error) {
+	if err != nil {
+		panic(err)
+	}
 }
