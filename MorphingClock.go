@@ -55,8 +55,8 @@ func Render() {
 				canvas.Set(curX, curY, color.RGBA{uint8(curR), uint8(curG), uint8(curB), uint8(curA)})
 			}
 		}
+		canvas.Render()
 	}
-	canvas.Render()
 }
 
 func RunClock() {
