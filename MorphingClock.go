@@ -20,6 +20,8 @@ var (
 	canvas *rgbmatrix.Canvas
 	sketch *image.RGBA
 	power = true
+	stopchan chan bool
+	stoppedchan chan bool
 )
 
 type ClockConfig struct {
@@ -57,73 +59,8 @@ func Render() {
 	canvas.Render()
 }
 
-func main() {
-	jsonConfig, _ := ioutil.ReadFile("config.json")
-	json.Unmarshal(jsonConfig, &clockConfig)
-	
-	config := &rgbmatrix.DefaultConfig
-	config.Rows = clockConfig.Rows
-	config.Cols = clockConfig.Cols
-	config.Parallel = clockConfig.Parallel
-	config.ChainLength = clockConfig.ChainLength
-	config.Brightness = clockConfig.ClockColor.V
-	config.HardwareMapping = clockConfig.HardwareMapping
-	config.ShowRefreshRate = clockConfig.ShowRefreshRate
-	config.InverseColors = clockConfig.InverseColors
-	config.DisableHardwarePulsing = clockConfig.DisableHardwarePulsing
-	
-	m, _ := rgbmatrix.NewRGBLedMatrix(config)
-
-	canvas = rgbmatrix.NewCanvas(m)
-	defer canvas.Close()
-	
+func RunClock() {
 	sketch = image.NewRGBA(canvas.Bounds())
-	
-	info := accessory.Info{
-		Name:         "Clock",
-		SerialNumber: "rpi-rgb-led-matrix",
-		Manufacturer: "Sunoo",
-		Model:        "Morphing Clock",
-	}
-
-	acc := accessory.NewLightbulb(info)
-	
-	acc.Lightbulb.On.SetValue(true)
-	acc.Lightbulb.Brightness.SetValue(clockConfig.ClockColor.V)
-	acc.Lightbulb.Saturation.SetValue(clockConfig.ClockColor.S)
-	acc.Lightbulb.Hue.SetValue(clockConfig.ClockColor.H)
-	
-	acc.Lightbulb.On.OnValueRemoteUpdate(func(on bool) {
-		power = on;
-		Render()
-	})
-	
-	acc.Lightbulb.Brightness.OnValueRemoteUpdate(func(bright int) {
-		clockConfig.ClockColor.V = bright
-		m.SetBrightness(bright)
-		Render()
-	})
-	
-	acc.Lightbulb.Saturation.OnValueRemoteUpdate(func(sat float64) {
-		clockConfig.ClockColor.S = sat
-		Render()
-	})
-	
-	acc.Lightbulb.Hue.OnValueRemoteUpdate(func(hue float64) {
-		clockConfig.ClockColor.H = hue
-		Render()
-	})
-
-	t, _ := hc.NewIPTransport(hc.Config{Pin: "12312312"}, acc.Accessory)
-	
-	hc.OnTermination(func() {
-		<-t.Stop()
-		jsonConfig, _ := json.MarshalIndent(clockConfig, "", "\t")
-		ioutil.WriteFile("config.json", jsonConfig, 0666)
-		os.Exit(0)
-	})
-
-	go t.Start()
 	
 	d1 := NewDigit(clockConfig.SegLength)
 	d2 := NewDigit(clockConfig.SegLength)
@@ -200,6 +137,91 @@ func main() {
 		select {
 			case <-time.After(time.Now().Truncate(time.Minute).Add(time.Minute).Sub(time.Now())):
 				//Just keep running
+			case <-stopchan:
+				canvas.Render()
+				stoppedchan <- true
+				return
 		}
 	}
+}
+
+func main() {
+	jsonConfig, _ := ioutil.ReadFile("config.json")
+	json.Unmarshal(jsonConfig, &clockConfig)
+	
+	stopchan = make(chan bool)
+	stoppedchan = make(chan bool)
+	
+	config := &rgbmatrix.DefaultConfig
+	config.Rows = clockConfig.Rows
+	config.Cols = clockConfig.Cols
+	config.Parallel = clockConfig.Parallel
+	config.ChainLength = clockConfig.ChainLength
+	config.Brightness = clockConfig.ClockColor.V
+	config.HardwareMapping = clockConfig.HardwareMapping
+	config.ShowRefreshRate = clockConfig.ShowRefreshRate
+	config.InverseColors = clockConfig.InverseColors
+	config.DisableHardwarePulsing = clockConfig.DisableHardwarePulsing
+	
+	m, _ := rgbmatrix.NewRGBLedMatrix(config)
+
+	canvas = rgbmatrix.NewCanvas(m)
+	defer canvas.Close()
+	
+	info := accessory.Info{
+		Name:         "Clock",
+		SerialNumber: "rpi-rgb-led-matrix",
+		Manufacturer: "Sunoo",
+		Model:        "Morphing Clock",
+	}
+
+	acc := accessory.NewLightbulb(info)
+	
+	acc.Lightbulb.On.SetValue(true)
+	acc.Lightbulb.Brightness.SetValue(clockConfig.ClockColor.V)
+	acc.Lightbulb.Saturation.SetValue(clockConfig.ClockColor.S)
+	acc.Lightbulb.Hue.SetValue(clockConfig.ClockColor.H)
+	
+	acc.Lightbulb.On.OnValueRemoteUpdate(func(on bool) {
+		if power != on {
+			power = on;
+			if on {
+				go RunClock()
+				<-stoppedchan
+			} else {
+				stopchan <- true
+			}
+		}
+	})
+	
+	acc.Lightbulb.Brightness.OnValueRemoteUpdate(func(bright int) {
+		clockConfig.ClockColor.V = bright
+		m.SetBrightness(bright)
+		Render()
+	})
+	
+	acc.Lightbulb.Saturation.OnValueRemoteUpdate(func(sat float64) {
+		clockConfig.ClockColor.S = sat
+		Render()
+	})
+	
+	acc.Lightbulb.Hue.OnValueRemoteUpdate(func(hue float64) {
+		clockConfig.ClockColor.H = hue
+		Render()
+	})
+
+	t, _ := hc.NewIPTransport(hc.Config{Pin: "12312312"}, acc.Accessory)
+	
+	hc.OnTermination(func() {
+		<-t.Stop()
+		jsonConfig, _ := json.MarshalIndent(clockConfig, "", "\t")
+		ioutil.WriteFile("config.json", jsonConfig, 0666)
+		os.Exit(0)
+	})
+
+	go t.Start()
+	
+	go RunClock()
+	
+	select {}
 }
