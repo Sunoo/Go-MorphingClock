@@ -33,9 +33,9 @@ type ClockConfig struct {
 	Rows int
 	Cols int
 	Parallel int
-	Chain int
+	ChainLength int
 	HardwareMapping string
-	ShowRefresh bool
+	ShowRefreshRate bool
 	InverseColors bool
 	DisableHardwarePulsing bool
 }
@@ -65,10 +65,10 @@ func main() {
 	config.Rows = clockConfig.Rows
 	config.Cols = clockConfig.Cols
 	config.Parallel = clockConfig.Parallel
-	config.ChainLength = clockConfig.Chain
+	config.ChainLength = clockConfig.ChainLength
 	config.Brightness = clockConfig.ClockColor.V
 	config.HardwareMapping = clockConfig.HardwareMapping
-	config.ShowRefreshRate = clockConfig.ShowRefresh
+	config.ShowRefreshRate = clockConfig.ShowRefreshRate
 	config.InverseColors = clockConfig.InverseColors
 	config.DisableHardwarePulsing = clockConfig.DisableHardwarePulsing
 	
@@ -95,11 +95,6 @@ func main() {
 	
 	acc.Lightbulb.On.OnValueRemoteUpdate(func(on bool) {
 		power = on;
-		/*if on {
-			m.SetBrightness(clockConfig.ClockColor.V)
-		} else {
-			m.SetBrightness(0)
-		}*/
 		Render()
 	})
 	
@@ -148,7 +143,7 @@ func main() {
 	d3pos := image.Rectangle{d3start, d3start.Add(d3.img.Bounds().Max)}
 	d4pos := image.Rectangle{d4start, d4start.Add(d4.img.Bounds().Max)}
 	
-	initialTime := true
+	warmUp := true
 	
 	for {
 		clock := time.Now().Format(clockConfig.TimeFormat)
@@ -179,7 +174,7 @@ func main() {
 				time.Sleep(clockConfig.AnimSpeed)
 			}
 		}
-		if initialTime {
+		if warmUp {
 			draw.Draw(sketch, copos, co.img, image.ZP, draw.Src)
 			Render()
 			time.Sleep(clockConfig.AnimSpeed)
@@ -202,7 +197,9 @@ func main() {
 				time.Sleep(clockConfig.AnimSpeed)
 			}
 		}
-		target := time.Now().Truncate(time.Minute).Add(time.Minute)
-		time.Sleep(target.Sub(time.Now()))
+		select {
+			case <-time.After(time.Now().Truncate(time.Minute).Add(time.Minute).Sub(time.Now())):
+				//Just keep running
+		}
 	}
 }
