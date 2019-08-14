@@ -19,7 +19,7 @@ import (
 )
 
 var (
-	clockConfig = ClockConfig{hsv.HSVColor{240, 100, 30}, 1, 2, 4, false, "03:04", 30 * time.Millisecond, 5 * time.Second, 16, 32, 1, 1, "regular", false, false, false}
+	clockConfig = ClockConfig{hsv.HSVColor{240, 100, 30}, 1, 2, 4, false, "03:04", 30 * time.Millisecond, time.Second / 2, 16, 32, 1, 1, "regular", false, false, false}
 	matrix rgbmatrix.Matrix
 	canvas *rgbmatrix.Canvas
 	sketch *image.RGBA
